@@ -58,14 +58,14 @@ void setup() {
 
   Serial.begin(115200);
 
-  servo1.attach(4);
-  servo2.attach(5);
-  servo3.attach(6);
+  servo1.attach(2);
+  servo2.attach(3);
+  servo3.attach(4);
   
-  servo4.attach(7);
-  servo5.attach(8);
-  servo6.attach(9);
-  servo7.attach(10);
+  servo4.attach(5);
+  servo5.attach(6);
+  servo6.attach(7);
+  servo7.attach(8);
 
   servo1.writeMicroseconds(1200);
   servo2.writeMicroseconds(1650);
