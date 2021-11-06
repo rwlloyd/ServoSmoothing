@@ -110,7 +110,7 @@ void processSerialCommand() {
   }
   // Chirp the message back just because.
   for (int i = 0; i < messageLength; i++) {
-    Serial.write(received[i]);
+    Serial.write(cmdPos[i]);
   }
   // Allow a new message
   commandReceived = false;

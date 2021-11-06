@@ -10,7 +10,7 @@ still mashing
 import serial
 import math
 from time import sleep
-import PG9038S as bt
+import fbox as bt
 import subprocess as sp
 
 print("    4 Wheel Drive Remote Control for Serial-Curtis Bridge v1.3 and Generic Bluetooth Controller")
@@ -23,20 +23,21 @@ print("    Usage: estop enable = either joystick buttons, cancel estop = both bu
 print("     - Rob Lloyd. 11/2021")
 
 # change to unique MAC address of bluetooth controller
-controllerMAC = "E4:17:D8:9A:F7:7B" 
+controllerMAC = "DD:44:63:38:84:07" 
 
 # create an object for the bluetooth control
 try:
-    controller = bt.eightbitdo("/dev/input/event0")
+    controller = bt.fbox("/dev/input/event1")
 except:
     print("Make sure the controller is connected before starting the script")
     exit
 
 # create an object for the serial port controlling the curtis units
 try:
-    actData = serial.Serial("/dev/ttyUSB0", 115200, timeout=1)
+    servoData = serial.Serial("/dev/ttyUSB0", 115200, timeout=1)
+    print("Connected to Serial Client")
 except:
-    print("Actuator Controller Failed to connect")
+    print("Serial client failed to connect")
     pass
 
 ## Functions -----------------------------------------------------------------------
@@ -47,32 +48,47 @@ def rescale(val, in_min, in_max, out_min, out_max):
     """
     return out_min + (val - in_min) * ((out_max - out_min) / (in_max - in_min))
 
-def generateActMessage(estopState:bool, enable: bool, height, angle):
+def generateMessage(rotation, tiltRight, tiltLeft, eyeLeft, blinkLeft, blinkRight, eyeRight):
     """
-    Accepts an input of two ints between -100 and 100
+
     """
-    # Empty list to fill with our message
     messageToSend = []
-    messageToSend.append(int(estopState))
-    messageToSend.append(int(enable))
-    messageToSend.append(int(height))
-    messageToSend.append(int(angle))
-    
+    messageToSend.append(int(rotation))
+    messageToSend.append(int(tiltRight))
+    messageToSend.append(int(tiltLeft))
+    messageToSend.append(int(eyeLeft))
+    messageToSend.append(int(blinkLeft))
+    messageToSend.append(int(blinkRight))
+    messageToSend.append(int(eyeRight))
+
     print("Sending: %s" % str(messageToSend))
     return messageToSend
+# def generateMessage(estopState:bool, enable: bool, height, angle):
+#     """
+#     Accepts an input of two ints between -100 and 100
+#     """
+#     # Empty list to fill with our message
+#     messageToSend = []
+#     messageToSend.append(int(estopState))
+#     messageToSend.append(int(enable))
+#     messageToSend.append(int(height))
+#     messageToSend.append(int(angle))
+    
+#     print("Sending: %s" % str(messageToSend))
+#     return messageToSend
 
 def send(message_in):
     """
     Function to send a message_in made of ints, convert them to bytes and then send them over a serial port
     message length, 10 bytes.
     """
-        messageLength = 4
-        message = []
-        for i in range(0, messageLength):
-            message.append(message_in[i].to_bytes(1, 'little'))
-        for i in range(0, messageLength):
-            actData.write(message[i])
-    #print(message)
+    messageLength = 7
+    message = []
+    for i in range(0, messageLength):
+        message.append(message_in[i].to_bytes(1, 'little'))
+    for i in range(0, messageLength):
+        servoData.write(message[i])
+    print(message)
 
 def receive(message):
     """
@@ -95,23 +111,24 @@ def isEnabled(newStates, enable, estopState):
     """ 
     Function to handle enable and estop states. it was getting annoying to look at.
     """
-    # to reset after estop left and right bumper buttons - press together to cancel estop
-    if newStates["trigger_l_1"] == 1 and newStates["trigger_r_1"] == 1:
-        estopState = False
+    enable = True
+    # # to reset after estop left and right bumper buttons - press together to cancel estop
+    # if newStates["trigger_l_1"] == 1 and newStates["trigger_r_1"] == 1:
+    #     estopState = False
 
-    # left and right joystick buttons trigger estop
-    if newStates["button_left_xy"] == 1 or newStates["button_right_xy"] == 1:
-        estopState = True 
+    # # left and right joystick buttons trigger estop
+    # if newStates["button_left_xy"] == 1 or newStates["button_right_xy"] == 1:
+    #     estopState = True 
     
-    if estopState == True:
-        enable = False #ok
-    print(newStates["trigger_l_1"])
-    # dead mans switch left or right trigger button
-    if newStates["trigger_l_2"] >= 1 or newStates["trigger_r_2"] >= 1:
-        if estopState == False:
-            enable = True
-    else:
-        enable = False
+    # if estopState == True:
+    #     enable = False #ok
+    # print(newStates["trigger_l_1"])
+    # # dead mans switch left or right trigger button
+    # if newStates["trigger_l_2"] >= 1 or newStates["trigger_r_2"] >= 1:
+    #     if estopState == False:
+    #         enable = True
+    # else:
+    #     enable = False
 
     return enable
 
@@ -137,13 +154,14 @@ def main():
 
     # Seems to be necessary to have a placeholder for the message here
 
-    actMessage = []
+    
     last_message = []
 
     # Main Loop
     while True:
-        stdoutdata = sp.getoutput("hcitool con")                                            # hcitool check status of bluetooth devices
-
+        newMessage = []
+        # hcitool check status of bluetooth devices
+        stdoutdata = sp.getoutput("hcitool con")
         # check bluetooth controller is connected if not then estop
         if controllerMAC not in stdoutdata.split():
             print("Bluetooth device is not connected")
@@ -151,15 +169,49 @@ def main():
             estopState = True
         else:
             enable = True
-
         # Check to see if there is new input from the controller. Most of the time there isn't, so handle the error
         try:
+            # Save the new inputs
             newStates = controller.readInputs()
         except IOError:
             pass
 
+        # Do Something with the controller here -----------------------------------------------------------------
+
+        # rotateAll
+        rotation = newStates["left_x"]
+        # tiltRight
+        tiltRight = newStates["left_y"]
+        # tiltleft
+        tiltLeft = newStates["right_y"]
+        # eyeLeft
+        eyeLeft = newStates["right_x"]
+        # blinkLeft
+        blinkLeft = newStates["right_tr_a"]
+        # blinkRight
+        blinkRight = newStates["left_tr_a"]
+        # eyeRight
+        eyeRight = newStates["right_x"]
+
+
+        # # Build new message for the servos 
+        newMessage = generateMessage(rotation, tiltRight, tiltLeft, eyeLeft, blinkLeft, blinkRight, eyeRight)     
+        print(newMessage) 
+        # Send the new message to the servo controller (arduino) 
+        send(newMessage)                                                                     
+        sleep(0.1)          # So that we don't keep spamming the Arduino....
+
+
+        
+
+if __name__ == "__main__":
+    main()
+
+
+# You know i'm reusing old code right... this might be useful for later
+
         #Check Enables and ESTOP
-        enable = isEnabled(newStates, enable, estopState)
+        #enable = isEnabled(newStates, enable, estopState)
         
         # # Handle the input for the raising and lowering of the tool. Don't let the tool go too high or low (0-255)
         # if newStates["dpad_y"] == -1 and toolPos < 255 - toolStep:
@@ -175,27 +227,15 @@ def main():
         # commandAngle = rescale(newStates["right_x"], 0, 65535, 65, 190)                 # JC 14/04/21 65 to 190 safe wheel angles
 
         # Check the enable state via the function
-        if isEnabled: 
-            # # Calculate the final inputs rescaling the absolute value to between -100 and 100
-            # commandVel = rescale(newStates["left_y"], 65535, 0, 0, 255)                   
+        # if isEnabled: 
+        #     # # Calculate the final inputs rescaling the absolute value to between -100 and 100
+        #     # commandVel = rescale(newStates["left_y"], 65535, 0, 0, 255)                   
             
-            # ###### THIS IS THE STUPID KINEMATIC MODEL ########
-            # v1, v2, v3, v4 = calculateSimpleVelocities(commandVel)
-            # #print(v1,v2,v3,v4)
+        #     # ###### THIS IS THE STUPID KINEMATIC MODEL ########
+        #     # v1, v2, v3, v4 = calculateSimpleVelocities(commandVel)
+        #     # #print(v1,v2,v3,v4)
 
-        else:
+        # else:
             # commandVel = 0
             # #v1, v2, v3, v4 = calculateVelocities(vehicleLength, vehicleWidth, cmdAng, 0)
             # v1, v2, v3, v4 = calculateSimpleVelocities(commandVel)
-   
-        
-        
-        
-        newActMessage = generateActMessage(estopState, enable, commandTool, commandAngle)   # Build new message for the actuators   
-        print(newActMessage) 
-        send(newActMessage)                                                              # Send the new message to the actuators and curtis arduinos        
-        sleep(0.1)                                                                          # So that we don't keep spamming the Arduino....
-
-
-if __name__ == "__main__":
-    main()

@@ -1,7 +1,7 @@
 from evdev import InputDevice, categorize, ecodes
 
 #evdev reference https://python-evdev.readthedocs.io/en/latest/apidoc.html
-class PG9038S():
+class fbox():
     def __init__(self, path):
         try:
             self.path = path
@@ -25,13 +25,18 @@ class PG9038S():
             #ev code for analogue ctrls
             self.left_x = 0
             self.left_y = 1
-            self.right_x = 3
+            self.right_x = 2
             self.right_y = 5
+
+            self.left_tr_a = 10
+            self.right_tr_a = 9
 
             self.states = {"left_x":128
             ,"left_y":128
             ,"right_x":128
             ,"right_y":128
+            ,"left_tr_a":0
+            ,"right_tr_a":0
             ,"dpad_x":0
             ,"dpad_y":0
             ,"button_a":0
@@ -66,6 +71,11 @@ class PG9038S():
                         self.states["right_x"] = event.value
                     if event.code == self.right_y and event.type == 3:
                         self.states["right_y"] = event.value
+                    # Analog Triggers
+                    if event.code == self.left_tr_a and event.type == 3:
+                        self.states["left_tr_a"] = event.value
+                    if event.code == self.right_tr_a and event.type == 3:
+                        self.states["right_tr_a"] = event.value
                     # D-Pad
                     if event.code == self.dpad_x and event.type == 3:
                         self.states["dpad_x"] = event.value
