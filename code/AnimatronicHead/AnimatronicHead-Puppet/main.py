@@ -25,6 +25,9 @@ print("     - Rob Lloyd. 11/2021")
 # change to unique MAC address of bluetooth controller
 controllerMAC = "DD:44:63:38:84:07" 
 
+# joystick Deadzone size 0-255 
+deadzone = 15
+
 # create an object for the bluetooth control
 try:
     controller = bt.fbox("/dev/input/event1")
@@ -63,19 +66,6 @@ def generateMessage(rotation, tiltRight, tiltLeft, eyeLeft, blinkLeft, blinkRigh
 
     print("Sending: %s" % str(messageToSend))
     return messageToSend
-# def generateMessage(estopState:bool, enable: bool, height, angle):
-#     """
-#     Accepts an input of two ints between -100 and 100
-#     """
-#     # Empty list to fill with our message
-#     messageToSend = []
-#     messageToSend.append(int(estopState))
-#     messageToSend.append(int(enable))
-#     messageToSend.append(int(height))
-#     messageToSend.append(int(angle))
-    
-#     print("Sending: %s" % str(messageToSend))
-#     return messageToSend
 
 def send(message_in):
     """
@@ -88,7 +78,7 @@ def send(message_in):
         message.append(message_in[i].to_bytes(1, 'little'))
     for i in range(0, messageLength):
         servoData.write(message[i])
-    print(message)
+    # print(message)
 
 def receive(message):
     """
@@ -101,7 +91,7 @@ def receive(message):
         while arduinoData.in_waiting > 0:
             for i in range(0, messageLength):
                 last_message.append(int.from_bytes(arduinoData.read(), "little"))
-        #print("GOT: ", last_message)
+        print("Receiving: ", last_message)
         return last_message
     except:
         print("Failed to receive serial message")
@@ -178,12 +168,37 @@ def main():
 
         # Do Something with the controller here -----------------------------------------------------------------
 
+        # Simply mapping sticks to the servos
+        # # rotateAll
+        # rotation = newStates["left_x"]
+        # # tiltRight
+        # tiltRight = newStates["left_y"]
+        # # tiltleft
+        # tiltLeft = 255 - newStates["left_y"]
+        # # eyeLeft
+        # eyeLeft = newStates["right_x"]
+        # # blinkLeft
+        # blinkLeft = newStates["right_tr_a"]
+        # # blinkRight
+        # blinkRight = newStates["left_tr_a"]
+        # # eyeRight
+        # eyeRight = 255 - newStates["right_x"]
+
+        # controlling depending on joystick values
         # rotateAll
         rotation = newStates["left_x"]
-        # tiltRight
+
+        # Head Up / down tiltRight  tiltleft
+        # pitch = newStates["left_y"]
+         
         tiltRight = newStates["left_y"]
-        # tiltleft
-        tiltLeft = newStates["right_y"]
+        tiltLeft = 255 - newStates["left_y"]
+
+        # tilt the head with right_y
+        if newStates["right_y"] >= 128 - deadzone or newStates["right_y"] <= 128 - deadzone:
+            tiltRight += (128 - newStates["right_y"])
+            tiltLeft += (128 - newStates["right_y"])
+  
         # eyeLeft
         eyeLeft = newStates["right_x"]
         # blinkLeft
@@ -191,15 +206,20 @@ def main():
         # blinkRight
         blinkRight = newStates["left_tr_a"]
         # eyeRight
-        eyeRight = newStates["right_x"]
+        eyeRight = 255 - newStates["right_x"]
+
+        # Make sure we don't try and send a negative value after mixing
+        rotation = limit(rotation, 1, 254)
+        tiltRight = limit(tiltRight, 10, 245)
+        tiltLeft = limit(tiltLeft, 10, 245)
 
 
         # # Build new message for the servos 
         newMessage = generateMessage(rotation, tiltRight, tiltLeft, eyeLeft, blinkLeft, blinkRight, eyeRight)     
-        print(newMessage) 
+        # print(newMessage) 
         # Send the new message to the servo controller (arduino) 
         send(newMessage)                                                                     
-        sleep(0.1)          # So that we don't keep spamming the Arduino....
+        # sleep(0.2)          # So that we don't keep spamming the Arduino....
 
 
         
