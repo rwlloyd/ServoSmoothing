@@ -15,7 +15,7 @@ int servoPins[] = {2, 3, 4, 5, 6, 7, 8};
 // use the servo minimums and maximums worked out with getServoCentres.ino
 int servoMins[] = {800, 800, 800, 1900, 1494, 1600, 1100};
 int servoMaxs[] = {2100, 2100, 2100, 900, 2095, 970, 1920};
-int servoCentres[] = {1385, 1500, 1467, 1360, 1795, 1285, 1648}; 
+int servoCentres[] = {1385, 1485, 1468, 1360, 1795, 1285, 1648}; 
 
 // Set up the arrays for the future, present and past servo positions
 float cmdPos[numServos];
@@ -106,11 +106,11 @@ void serialEvent()   {
 void processSerialCommand() {
   // Loop throught the received serial 0-255 bytes and map them to the servo microsecond values. Store them in cmdPos array.
   for (int i = 0; i < messageLength; i++) {
-    cmdPos[i] = map(received[i], 0, 255, servoMins[i], servoMaxs[i]);
+    cmdPos[i] = floor(map(int(received[i]), 0, 255, servoMins[i], servoMaxs[i]));
   }
   // Chirp the message back just because.
   for (int i = 0; i < messageLength; i++) {
-    Serial.write(cmdPos[i]);
+    Serial.write(received[i]);
   }
   // Allow a new message
   commandReceived = false;
