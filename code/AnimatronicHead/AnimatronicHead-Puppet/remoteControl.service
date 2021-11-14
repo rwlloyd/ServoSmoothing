@@ -1,0 +1,14 @@
+[Unit]
+Description=Service for Bluetooth Remote Control
+After=getty.target
+
+[Service]
+ExecStart=python3 main.py
+WorkingDirectory=/home/pi/ServoSmoothing/code/AnimatronicHead/AnimatronicHead-Puppet/
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target

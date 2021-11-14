@@ -13,17 +13,23 @@ from time import sleep
 import fbox as bt
 import subprocess as sp
 
-print("    4 Wheel Drive Remote Control for Serial-Curtis Bridge v1.3 and Generic Bluetooth Controller")
-print("    Four wheel drive electronic differential with ackermann steering via linear actuator and ancilliary lift")
-print("    Usage: Left or Right Trigger = Toggle Enable")
-print("    Usage: Left Joystick for forward and reverse motion")
-print("    Usage: Right Joystick for steering left and right")
-print("    Usage: DPad up/down to raise/lower tool")
-print("    Usage: estop enable = either joystick buttons, cancel estop = both bumper buttons")
+print("   ----------------------------------------------------------")
+print("    Animatronic Head Puppet with Generic Bluetooth Controller")
+print("   ----------------------------------------------------------")
+print("    Button A = Enable/Disable")
+print("    Left Thumbstick X = Rotation")
+print("    Left Thumbstick Y = Pitch")
+print("    Right Thumbstick X = Eyes left and right")
+print("    Right Thumbstick Y = Tilt head")
+print("    Left/Right triggers = Left / Right Blink")
+print("    ")
 print("     - Rob Lloyd. 11/2021")
-
+print("    ")
 # change to unique MAC address of bluetooth controller
 controllerMAC = "DD:44:63:38:84:07" 
+
+# joystick Deadzone size 0-255 
+deadzone = 15
 
 # create an object for the bluetooth control
 try:
@@ -61,21 +67,7 @@ def generateMessage(rotation, tiltRight, tiltLeft, eyeLeft, blinkLeft, blinkRigh
     messageToSend.append(int(blinkRight))
     messageToSend.append(int(eyeRight))
 
-    print("Sending: %s" % str(messageToSend))
     return messageToSend
-# def generateMessage(estopState:bool, enable: bool, height, angle):
-#     """
-#     Accepts an input of two ints between -100 and 100
-#     """
-#     # Empty list to fill with our message
-#     messageToSend = []
-#     messageToSend.append(int(estopState))
-#     messageToSend.append(int(enable))
-#     messageToSend.append(int(height))
-#     messageToSend.append(int(angle))
-    
-#     print("Sending: %s" % str(messageToSend))
-#     return messageToSend
 
 def send(message_in):
     """
@@ -86,9 +78,10 @@ def send(message_in):
     message = []
     for i in range(0, messageLength):
         message.append(message_in[i].to_bytes(1, 'little'))
+    print("Sending: %s" % str(message_in))
     for i in range(0, messageLength):
         servoData.write(message[i])
-    print(message)
+    # print(message)
 
 def receive(message):
     """
@@ -101,7 +94,7 @@ def receive(message):
         while arduinoData.in_waiting > 0:
             for i in range(0, messageLength):
                 last_message.append(int.from_bytes(arduinoData.read(), "little"))
-        #print("GOT: ", last_message)
+        print("Receiving: ", last_message)
         return last_message
     except:
         print("Failed to receive serial message")
@@ -151,10 +144,10 @@ def main():
     # Initialise  values for enable and estop
     estopState = False
     enable = False
+    # Switch so we can toggle the servos on and off
+    puppet = False
 
     # Seems to be necessary to have a placeholder for the message here
-
-    
     last_message = []
 
     # Main Loop
@@ -178,12 +171,40 @@ def main():
 
         # Do Something with the controller here -----------------------------------------------------------------
 
+        # Simply mapping sticks to the servos
+        # # rotateAll
+        # rotation = newStates["left_x"]
+        # # tiltRight
+        # tiltRight = newStates["left_y"]
+        # # tiltleft
+        # tiltLeft = 255 - newStates["left_y"]
+        # # eyeLeft
+        # eyeLeft = newStates["right_x"]
+        # # blinkLeft
+        # blinkLeft = newStates["right_tr_a"]
+        # # blinkRight
+        # blinkRight = newStates["left_tr_a"]
+        # # eyeRight
+        # eyeRight = 255 - newStates["right_x"]
+
+        # If we press the 'a' button, the puppet control will turn on and off
+        if newStates["button_y"]:
+            puppet = not puppet
+        
+
+        # controlling depending on joystick values
         # rotateAll
         rotation = newStates["left_x"]
-        # tiltRight
+
+        # Head Up/Down  with tiltRight and tiltleft in parrallel
         tiltRight = newStates["left_y"]
-        # tiltleft
-        tiltLeft = newStates["right_y"]
+        tiltLeft = 255 - newStates["left_y"]
+
+        # tilt the head with right_y and tiltRight and tiltLeft in opposition
+        if newStates["right_y"] >= 128 - deadzone or newStates["right_y"] <= 128 - deadzone:
+            tiltRight += (128 - newStates["right_y"])
+            tiltLeft += (128 - newStates["right_y"])
+
         # eyeLeft
         eyeLeft = newStates["right_x"]
         # blinkLeft
@@ -191,18 +212,20 @@ def main():
         # blinkRight
         blinkRight = newStates["left_tr_a"]
         # eyeRight
-        eyeRight = newStates["right_x"]
+        eyeRight = 255 - newStates["right_x"]
 
+        # Make sure we don't try and send a negative value after mixing
+        rotation = limit(rotation, 1, 254)
+        tiltRight = limit(tiltRight, 10, 245)
+        tiltLeft = limit(tiltLeft, 10, 245)
 
         # # Build new message for the servos 
         newMessage = generateMessage(rotation, tiltRight, tiltLeft, eyeLeft, blinkLeft, blinkRight, eyeRight)     
-        print(newMessage) 
-        # Send the new message to the servo controller (arduino) 
-        send(newMessage)                                                                     
-        sleep(0.1)          # So that we don't keep spamming the Arduino....
-
-
-        
+        # print(newMessage) 
+        if puppet == True:
+            # Send the new message to the servo controller (arduino) 
+            send(newMessage)                                                                     
+            # sleep(0.2)          # So that we don't keep spamming the Arduino....
 
 if __name__ == "__main__":
     main()

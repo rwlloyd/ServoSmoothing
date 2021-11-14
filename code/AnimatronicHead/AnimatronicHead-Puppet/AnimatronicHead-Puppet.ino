@@ -104,7 +104,7 @@ void serialEvent()   {
 
 // Function to split up the received serial command and set the appropriate variables
 void processSerialCommand() {
-  // Loop throught the received serial 0-255 bytes and map them to the servo microsecond values. Store them in cmdPos array.
+  // Loop throught the received serial 0-255 bytes, cast them to ints and map them to the servo microsecond values. Store values in cmdPos array.
   for (int i = 0; i < messageLength; i++) {
     cmdPos[i] = floor(map(int(received[i]), 0, 255, servoMins[i], servoMaxs[i]));
   }
