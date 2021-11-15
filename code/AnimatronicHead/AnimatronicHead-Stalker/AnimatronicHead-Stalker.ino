@@ -1,4 +1,7 @@
-/* MultiServoController
+/* Modified From MultiServoController
+
+  Different controller file because I may make some changes to deal with a camera input rather than joysticks.
+  But in reality, most of the decision stuff is intended to be controlled from the controller script
 
   should probably do this with struct and array
   https://forum.arduino.cc/t/multiple-lines-of-code-running-simultaneously/583332/29 29/34
@@ -95,7 +98,7 @@ void serialEvent()   {
   // Read the Serial Buffer
   for (int i = 0; i < messageLength; i++) {
     received[i] = Serial.read();
-    delay(1);
+    delay(1); // Again, using delay might be regrettable
   }
   // Change the flag because a command has been received
   commandReceived = true;
