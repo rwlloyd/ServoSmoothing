@@ -56,11 +56,11 @@ print("    ")
 
 ### OPENCV stuff 
 # Create a VideoCapture object
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 # https://docs.opencv.org/3.4/d1/de5/classcv_1_1CascadeClassifier.html
-b_cascade = cv2.CascadeClassifier("haarcascade_fullbody.xml")
-f_cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+b_cascade = cv2.CascadeClassifier("D:\dev\ServoSmoothing\code\AnimatronicHead\AnimatronicHead-Stalker\haarcascade_fullbody.xml")
+f_cascade = cv2.CascadeClassifier("D:\dev\ServoSmoothing\code\AnimatronicHead\AnimatronicHead-Stalker\haarcascade_frontalface_default.xml")
 # Check if camera opened successfully
 if (cap.isOpened() == False): 
   print("Unable to read camera feed")
@@ -160,25 +160,34 @@ def main():
     # Switch so we can toggle the servos on and off
     puppet = False
 
-    # Seems to be necessary to have a placeholder for the message here
-    last_message = []
+    
+
+    # instantiate dx and dy. 
+    dx=127
+    dy=127
 
     # Main Loop
     while (True):
         newMessage = []
+        
         enable = True
        
         # Deal with getting a frame from the camera and detecting a face
         ret, frame = cap.read()
+        if not ret:
+            print("Can't receive frame")
+            break
+        
         if ret == True: 
+            
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             # bodies = b_cascade.detectMultiScale(gray)
             faces = f_cascade.detectMultiScale(gray, 1.3, 5)
             # print(bodies,faces)
-            print(faces)
+            # print(faces)
 
-            for (x, y, w, h) in faces:
-                if len(faces) ==  1:
+            if len(faces) ==  1:
+                for (x, y, w, h) in faces:
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                     cv2.drawMarker(frame, getCentre(x, y, w, h), (0, 0, 255), 0, 20, 1)
 
@@ -186,16 +195,74 @@ def main():
                     ## But we can be hacky for now?
 
                     face_centre_x, face_centre_y = getCentre(x, y, w, h)
-                    dx = frame_width - face_centre_x
-                    dy = frame_height - face_centre_y
-                     
+                    dx = math.fabs(frame_width - face_centre_x)
+                    dy = math.fabs(frame_height - face_centre_y)
+                    # print(dx, dy)
+                        
                     # control rotation depending on x offset
                     rotation = rescale(dx, 0, frame_width, 0, 255)
 
+                    # controlling depending on input from the camera
+                    # rotateAll
+                    # rotation = 127
+
+                    # Head Up/Down  with tiltRight and tiltleft in parrallel
+                    # tiltRight = 127
+                    # tiltLeft = 255 - 127
+
                     # Control Head Up/Down  with tiltRight and tiltleft in parrallel
                     # y motion depending on y offset
-                    tiltRight = rescale(dy, 0, frame_height, 0, 255)
-                    tiltLeft = 255 - rescale(dy, 0, frame_height, 0, 255)
+                    tiltRight = 255-rescale(dy, 0, frame_height, 0, 255)
+                    tiltLeft = rescale(dy, 0, frame_height, 0, 255)
+                    print(rotation, tiltRight, tiltLeft) 
+                    
+                    tilt = 127  #tilt is a number 0-255 that represents the tilt - full left to full right
+                    deadzone = 10 #pixels?
+                    
+                    # tilt the head with right_y and tiltRight and tiltLeft in opposition
+                    if tilt >= 128 - deadzone or tilt <= 128 - deadzone:
+                        tiltRight += (128 - tilt)
+                        tiltLeft += (128 - tilt)
+
+                    # eyeLeft
+                    eyeLeft = 127
+                    # blinkLeft
+                    blinkLeft = 0
+                    # blinkRight
+                    blinkRight = 0
+                    # eyeRight
+                    eyeRight = 127
+
+                    # Make sure we don't try and send a negative value after mixing
+                    rotation = floor(limit(rotation, 1, 254))
+                    tiltRight = floor(limit(tiltRight, 10, 245))
+                    tiltLeft = floor(limit(tiltLeft, 10, 245))
+
+            elif len(faces)==0:
+                                # controlling depending on input from the camera
+                # rotateAll
+                rotation = 127
+
+                # Head Up/Down  with tiltRight and tiltleft in parrallel
+                tiltRight = 127
+                tiltLeft = 255 - 127
+            # eyeLeft
+                eyeLeft = 127
+                # blinkLeft
+                blinkLeft = 0
+                # blinkRight
+                blinkRight = 0
+                # eyeRight
+                eyeRight = 127
+            
+            # # Build new message for the servos 
+            newMessage = generateMessage(rotation, tiltRight, tiltLeft, eyeLeft, blinkLeft, blinkRight, eyeRight)     
+            # print(newMessage) 
+            # if puppet == True:
+                # Send the new message to the servo controller (arduino) 
+            send(newMessage) 
+            #receive(lastMessage)                                                                    
+            sleep(0.2)          # So that we don't keep spamming the Arduino....
 
            # Display the resulting frame    
             cv2.imshow('frame',frame)
@@ -209,43 +276,7 @@ def main():
             print("Can't read Viideo stream")
             break 
 
-        # # controlling depending on joystick values
-        # # rotateAll
-        # rotation = 127
 
-        # # Head Up/Down  with tiltRight and tiltleft in parrallel
-        # tiltRight = 127
-        # tiltLeft = 255 - 127
-
-        tilt = 127  #tilt is a number 0-255 that represents the tilt - full left to full right
-        deadzone = 10 #pixels?
-
-        # tilt the head with right_y and tiltRight and tiltLeft in opposition
-        if tilt >= 128 - deadzone or tilt <= 128 - deadzone:
-            tiltRight += (128 - tilt)
-            tiltLeft += (128 - tilt)
-
-        # eyeLeft
-        eyeLeft = 127
-        # blinkLeft
-        blinkLeft = 0
-        # blinkRight
-        blinkRight = 0
-        # eyeRight
-        eyeRight = 127
-
-        # Make sure we don't try and send a negative value after mixing
-        rotation = limit(rotation, 1, 254)
-        tiltRight = limit(tiltRight, 10, 245)
-        tiltLeft = limit(tiltLeft, 10, 245)
-
-        # # Build new message for the servos 
-        newMessage = generateMessage(rotation, tiltRight, tiltLeft, eyeLeft, blinkLeft, blinkRight, eyeRight)     
-        # print(newMessage) 
-        if puppet == True:
-            # Send the new message to the servo controller (arduino) 
-            send(newMessage)                                                                     
-            # sleep(0.2)          # So that we don't keep spamming the Arduino....
     
     # When everything done, release the video capture and video write objects
     cap.release()
